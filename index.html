@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TruckRoute Pro — Semi Truck Mileage & Routing</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel-2:#1c232d; --border:#2a323d;
+    --text:#e6edf3; --muted:#8b96a5; --accent:#ff9f1c; --accent-2:#ffbf69;
+    --green:#2ec27e; --red:#e5484d; --blue:#4c9aff;
+    --shadow:0 8px 30px rgba(0,0,0,.35); --radius:14px;
+  }
+  body.light{
+    --bg:#eef1f5; --panel:#ffffff; --panel-2:#f2f5f9; --border:#d7dee7;
+    --text:#1a2430; --muted:#5c6b7a; --shadow:0 8px 30px rgba(60,80,110,.15);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); overflow:hidden}
+  .app{display:grid; grid-template-columns:410px 1fr; height:100vh}
+  .sidebar{background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; height:100vh}
+  .brand{display:flex; align-items:center; gap:12px; padding:18px 20px; border-bottom:1px solid var(--border)}
+  .brand .logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--accent),#ff7b00);
+    display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 14px rgba(255,123,0,.4);flex:none}
+  .brand h1{font-size:18px;margin:0;letter-spacing:.3px}
+  .brand p{margin:2px 0 0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px}
+  .brand .gear{margin-left:auto;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);
+    width:36px;height:36px;border-radius:9px;cursor:pointer;font-size:17px;flex:none}
+  .brand .gear:hover{color:var(--accent);border-color:var(--accent)}
+  .scroll{overflow-y:auto; padding:16px 18px 90px; flex:1}
+  .scroll::-webkit-scrollbar{width:8px} .scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px}
+  .section{margin-bottom:22px}
+  .section-title{display:flex;align-items:center;gap:8px;font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:0 0 12px}
+  .section-title .ico{color:var(--accent)}
+  .stop{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .stop .dot{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:#0e1116;background:var(--accent-2)}
+  .stop.first .dot{background:var(--green)} .stop.last .dot{background:var(--red)}
+  .stop .selwrap{flex:1;display:grid;grid-template-columns:84px 1fr 62px;gap:6px}
+  .stop select,.stop input{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:10px 8px;border-radius:9px;font-size:13.5px;outline:none;width:100%}
+  .stop select{cursor:pointer}
+  .stop select:focus,.stop input:focus{border-color:var(--accent)}
+  .stop input::placeholder{color:var(--muted)}
+  .stop .rm{flex:none;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:4px;line-height:1}
+  .stop .rm:hover{color:var(--red)}
+  .add-stop{width:100%;background:var(--panel-2);border:1px dashed var(--border);color:var(--accent);
+    padding:11px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;margin-top:4px}
+  .add-stop:hover{border-color:var(--accent)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;color:var(--muted);letter-spacing:.4px}
+  .field input,.field select{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+    padding:10px;border-radius:9px;font-size:13.5px;outline:none;width:100%}
+  .field input:focus,.field select:focus{border-color:var(--accent)}
+  .preset-row{display:grid;grid-template-columns:1fr auto auto;gap:7px;margin-bottom:12px}
+  .preset-row select{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:9px;border-radius:9px;font-size:13px}
+  .mini{background:var(--panel-2);border:1px solid var(--border);color:var(--accent);border-radius:9px;padding:0 12px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
+  .mini:hover{border-color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:8px 12px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);
+    font-size:12.5px;cursor:pointer;color:var(--muted);user-select:none}
+  .chip.on{background:rgba(255,159,28,.15);border-color:var(--accent);color:var(--accent-2)}
+  .go{position:absolute;bottom:0;left:0;width:410px;padding:16px 18px;background:linear-gradient(180deg,rgba(0,0,0,0),var(--panel) 30%)}
+  .btn-go{width:100%;padding:15px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),#ff7b00);color:#0e1116;box-shadow:0 6px 18px rgba(255,123,0,.35)}
+  .btn-go:hover{filter:brightness(1.05)} .btn-go:disabled{opacity:.6;cursor:default}
+  .badge{font-size:10px;padding:3px 7px;border-radius:6px;font-weight:700;letter-spacing:.5px}
+  .badge.live{background:rgba(46,194,126,.15);color:var(--green)}
+  .badge.demo{background:rgba(255,159,28,.15);color:var(--accent-2)}
+  .hint{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.5}
+  .hint a{color:var(--accent-2)}
+  .main{position:relative;height:100vh}
+  #map{position:absolute;inset:0;background:#aab7c4}
+  .results{position:absolute;top:16px;right:16px;width:340px;max-height:calc(100vh - 32px);overflow-y:auto;
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);transform:translateX(380px);transition:transform .35s cubic-bezier(.2,.7,.3,1);z-index:500}
+  .results.show{transform:translateX(0)}
+  .res-head{padding:18px 18px 14px;border-bottom:1px solid var(--border)}
+  .res-head .route-name{font-size:13px;color:var(--muted);margin-bottom:4px}
+  .res-head .rt-tag{font-size:10px;font-weight:700;letter-spacing:.6px;color:var(--accent-2);text-transform:uppercase}
+  .res-head .big{font-size:34px;font-weight:800;letter-spacing:-.5px}
+  .res-head .big span{font-size:16px;color:var(--muted);font-weight:600}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+  .kpi{background:var(--panel);padding:14px 16px}
+  .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .kpi .val{font-size:19px;font-weight:700;margin-top:3px}
+  .kpi .val small{font-size:12px;color:var(--muted);font-weight:500}
+  .res-body{padding:16px 18px}
+  .res-body h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:2px 0 10px;display:flex;justify-content:space-between}
+  .res-body h3 .exp{color:var(--accent-2);cursor:pointer;font-size:11px;letter-spacing:.3px}
+  .dir{padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;display:flex;gap:9px;align-items:flex-start}
+  .dir:last-child{border:none}
+  .dir .num{flex:none;width:20px;height:20px;border-radius:50%;background:var(--panel-2);border:1px solid var(--border);font-size:10px;display:flex;align-items:center;justify-content:center;color:var(--muted);margin-top:1px}
+  .dir .txt{flex:1;line-height:1.4}
+  .dir .rd{color:var(--muted);font-size:11.5px;margin-top:2px}
+  .dir .mi{color:var(--accent-2);font-weight:600;font-size:12px;white-space:nowrap}
+  .dir-leg{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent-2);margin:14px 0 6px}
+  .dir-leg:first-child{margin-top:2px}
+  .hwy-strip{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 4px}
+  .hwy-strip .lead{width:100%;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+  .hwy-chip{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:5px 9px;font-size:12px;font-weight:700;color:var(--accent-2)}
+  .hwy-arrow{color:var(--muted);align-self:center;font-size:11px}
+  .opt-lead{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 8px}
+  .opt{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;background:var(--panel-2)}
+  .opt:hover{border-color:var(--accent)}
+  .opt.sel{border-color:var(--accent);background:rgba(255,159,28,.10)}
+  .opt .opt-i{flex:none;color:var(--accent);font-size:14px}
+  .opt .opt-main{flex:1;font-size:13.5px;font-weight:600}
+  .opt .opt-sub{font-size:11.5px;color:var(--muted);font-weight:400;margin-top:2px}
+  .opt .opt-mi{color:var(--accent-2);font-weight:700;font-size:13.5px;white-space:nowrap}
+  .leg{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px}
+  .leg:last-child{border:none}
+  .leg .lg-from{color:var(--text)} .leg .lg-mi{color:var(--accent-2);font-weight:700}
+  .leg .lg-sub{color:var(--muted);font-size:12px}
+  table.ifta{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  table.ifta th{text-align:left;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;padding:6px 4px;border-bottom:1px solid var(--border)}
+  table.ifta td{padding:8px 4px;border-bottom:1px solid var(--border)}
+  table.ifta td:last-child,table.ifta th:last-child{text-align:right}
+  table.ifta .st{font-weight:700;color:var(--accent-2)}
+  .divider{height:1px;background:var(--border);margin:18px 0}
+  .status{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:600;
+    background:var(--panel);border:1px solid var(--border);border-radius:30px;padding:10px 20px;font-size:13px;
+    box-shadow:var(--shadow);display:none;align-items:center;gap:10px}
+  .status.show{display:flex}
+  .spinner{width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .empty{position:absolute;top:50%;left:calc(50% + 190px);transform:translate(-50%,-50%);text-align:center;pointer-events:none;width:300px;
+    background:rgba(255,255,255,.86);padding:22px 26px;border-radius:16px;box-shadow:var(--shadow)}
+  .empty .ico{font-size:52px;opacity:.6}
+  .empty h2{font-size:17px;color:#1a2430;margin:12px 0 6px;font-weight:700}
+  .empty p{font-size:13px;line-height:1.6;margin:0;color:#4a5765}
+  .updated{font-size:11px;color:var(--muted);text-align:center;padding:10px 0 4px}
+  .updated b{color:var(--green)}
+  .toolbar{position:absolute;top:16px;left:16px;z-index:500;display:flex;gap:8px}
+  .toolbar button{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:9px;
+    padding:9px 13px;font-size:13px;cursor:pointer;box-shadow:var(--shadow);font-weight:600}
+  .toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+  .ins{display:flex;justify-content:center;margin:-3px 0 7px}
+  .ins button{background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:2px 10px;border-radius:6px}
+  .ins button:hover{color:var(--accent);background:var(--panel-2)}
+  .toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:700;background:var(--panel);
+    border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:11px 16px;font-size:13px;
+    box-shadow:var(--shadow);max-width:520px;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .assistant{position:absolute;bottom:16px;right:16px;width:344px;height:70vh;max-height:560px;display:none;flex-direction:column;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);z-index:800;overflow:hidden}
+  .assistant.show{display:flex}
+  .as-head{display:flex;align-items:center;gap:9px;padding:13px 15px;border-bottom:1px solid var(--border);font-weight:700;font-size:14px}
+  .as-head .dotai{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .as-head .x{margin-left:auto;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+  .as-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .msg{max-width:86%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+  .msg.u{align-self:flex-end;background:var(--accent);color:#0e1116;border-bottom-right-radius:3px}
+  .msg.a{align-self:flex-start;background:var(--panel-2);border:1px solid var(--border);border-bottom-left-radius:3px}
+  .as-input{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border)}
+  .as-input input{flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:9px;font-size:13px;outline:none}
+  .as-input input:focus{border-color:var(--accent)}
+  .as-input button{background:var(--accent);border:none;color:#0e1116;border-radius:9px;padding:0 15px;font-weight:700;cursor:pointer}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:none;align-items:center;justify-content:center}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:440px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow)}
+  .modal-head{display:flex;align-items:center;padding:18px 20px;border-bottom:1px solid var(--border)}
+  .modal-head h2{margin:0;font-size:17px}
+  .modal-head .x{margin-left:auto;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
+  .modal-body{padding:18px 20px}
+  .modal-body .field{margin-bottom:15px}
+  .swatches{display:flex;gap:9px;flex-wrap:wrap}
+  .sw{width:30px;height:30px;border-radius:8px;cursor:pointer;border:2px solid transparent}
+  .sw.on{border-color:var(--text)}
+  .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px}
+  .modal-foot button{flex:1;padding:12px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;border:none}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#ff7b00);color:#0e1116}
+  .btn-ghost{background:var(--panel-2);border:1px solid var(--border)!important;color:var(--text)}
+  @media(max-width:860px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+    .sidebar{height:auto;max-height:54vh}.go{position:static;width:100%;background:var(--panel)}
+    .results{width:auto;left:12px;right:12px;transform:translateY(-160%)}.results.show{transform:translateY(0)}
+    .empty{left:50%}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🚛</div>
+      <div><h1 id="appName">TruckRoute&nbsp;Pro</h1><p id="appTag">Semi Mileage &amp; Routing</p></div>
+      <button class="gear" title="Settings" onclick="openSettings()">⚙</button>
+    </div>
+    <div class="scroll">
+      <div class="section">
+        <p class="section-title"><span class="ico">📍</span> Route Stops</p>
+        <div id="stops"></div>
+        <button class="add-stop" onclick="addStop()">＋ Add stop</button>
+      </div>
+
+      <div class="section">
+        <p class="section-title"><span class="ico">🧭</span> Route Type</p>
+        <div class="field">
+          <select id="routeType">
+            <option value="practical">Practical — fastest truck-legal route</option>
+            <option value="shortest">Shortest — fewest miles (truck-legal)</option>
+            <option value="fastest">Fastest — least drive time</option>
+          </select>
+        </div>
+        <label style="display:flex;align-items:center;gap:9px;margin-top:11px;font-size:13.5px;cursor:pointer">
+          <input type="checkbox" id="roundTrip" onchange="saveState()" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer">
+          Return to start (round trip)
+        </label>
+      </div>
+
+      <div class="section">
+        <p class="section-title"><span class="ico">🚛</span> Truck Profile</p>
+        <div class="preset-row">
+          <select id="presetSel" onchange="loadPreset()"><option value="">Saved presets…</option></select>
+          <button class="mini" onclick="savePreset()">Save</button>
+          <button class="mini" onclick="deletePreset()">✕</button>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Height (ft)</label><input id="t_height" type="number" step="0.1" value="13.6"></div>
+          <div class="field"><label>Length (ft)</label><input id="t_length" type="number" step="1" value="70"></div>
+          <div class="field"><label>Width (ft)</label><input id="t_width" type="number" step="0.1" value="8.5"></div>
+          <div class="field"><label>Gross weight (lbs)</label><input id="t_weight" type="number" step="500" value="80000"></div>
+          <div class="field"><label>Axles</label><input id="t_axles" type="number" step="1" value="5"></div>
+          <div class="field"><label>Trailers</label><input id="t_trailers" type="number" step="1" value="1"></div>
+        </div>
+        <div style="margin-top:12px">
+          <label style="font-size:11px;color:var(--muted)">Hazmat / special</label>
+          <div class="chips" id="hazmat" style="margin-top:7px">
+            <span class="chip" data-h="explosive">Explosive</span>
+            <span class="chip" data-h="flammable">Flammable</span>
+            <span class="chip" data-h="corrosive">Corrosive</span>
+            <span class="chip" data-h="poison">Poison</span>
+            <span class="chip" data-h="gas">Gas</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-title"><span class="ico">⛽</span> Cost &amp; Fuel</p>
+        <div class="grid2">
+          <div class="field"><label>Fuel economy (mpg)</label><input id="c_mpg" type="number" step="0.1" value="6.5"></div>
+          <div class="field"><label>Diesel price (/gal)</label><input id="c_diesel" type="number" step="0.01" value="3.85"></div>
+          <div class="field"><label>Driver pay (/mi)</label><input id="c_pay" type="number" step="0.01" value="0.60"></div>
+          <div class="field"><label>Toll roads</label>
+            <select id="c_avoidtolls"><option value="yes" selected>Avoid all tolls</option><option value="no">Allow tolls</option></select></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="section-title"><span class="ico">🔑</span> Routing Engine <span id="modeBadge" class="badge demo">DEMO</span></p>
+        <div class="field" style="margin-bottom:10px">
+          <label>OpenRouteService key <span style="color:var(--green);font-weight:700">— FREE truck routing</span></label>
+          <input id="orskey" placeholder="Paste free ORS key">
+        </div>
+        <div class="field">
+          <label>HERE key <span style="color:var(--muted)">— truck + live tolls (paid)</span></label>
+          <input id="apikey" placeholder="Paste HERE key (optional)">
+        </div>
+        <p class="hint"><b>No key?</b> Runs on real roads via OpenStreetMap (free, no signup).<br>
+          <b>Free truck routing:</b> key at
+          <a href="https://openrouteservice.org/dev/#/signup" target="_blank">openrouteservice.org</a> — obeys height/weight/length limits at no cost.<br>
+          <b>HERE</b> adds live toll pricing (paid). Everything you enter is saved on this computer for next time.</p>
+      </div>
+    </div>
+    <div class="go">
+      <button class="btn-go" id="goBtn" onclick="calculate()">Calculate Route &amp; Miles</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="map"></div>
+    <div class="toolbar">
+      <button onclick="updateData()">🔄 Update maps &amp; roads</button>
+      <button onclick="clearRoute()">Clear</button>
+      <button onclick="printSheet()">Print trip sheet</button>
+      <button onclick="directionsSheet()">🛣 Road-by-road</button>
+      <button onclick="toggleAssistant()">🤖 Assistant</button>
+    </div>
+    <div class="status" id="status"><div class="spinner"></div><span id="statusTxt">Routing…</span></div>
+
+    <div class="empty" id="empty">
+      <div class="ico">🗺️</div>
+      <h2>Plan a truck route</h2>
+      <p>Pick a state and city for each stop, choose your route type, set your truck specs, then hit <b>Calculate</b> for door-to-door miles, tolls, fuel and IFTA state breakdown.</p>
+    </div>
+
+    <div class="results" id="results">
+      <div class="res-head">
+        <div class="route-name" id="routeName">Route</div>
+        <div class="rt-tag" id="rtTag"></div>
+        <div class="big" id="totalMiles">0 <span>mi</span></div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">Drive time</div><div class="val" id="kDrive">—</div></div>
+        <div class="kpi"><div class="lbl">Toll cost</div><div class="val" id="kToll">—</div></div>
+        <div class="kpi"><div class="lbl">Fuel cost</div><div class="val" id="kFuel">—</div></div>
+        <div class="kpi"><div class="lbl">Total cost</div><div class="val" id="kTotal">—</div></div>
+      </div>
+      <div class="res-body">
+        <div id="stopChoices"></div>
+        <div id="routeOpts"></div>
+        <div id="hwyStrip" class="hwy-strip"></div>
+        <h3>Legs</h3>
+        <div id="legs"></div>
+        <div class="divider"></div>
+        <h3 id="iftaTitle">IFTA — Distance by State</h3>
+        <table class="ifta"><thead><tr><th>State</th><th id="iftaUnit">Miles</th><th>%</th></tr></thead>
+          <tbody id="iftaBody"></tbody></table>
+        <div class="divider"></div>
+        <h3>Road-by-Road <span class="exp" id="dirToggle" onclick="toggleDirections()">show ▸</span></h3>
+        <div id="dirList" style="display:none"></div>
+        <div class="updated" id="updated"></div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <div class="assistant" id="assistant">
+      <div class="as-head"><span class="dotai"></span> Dispatch Assistant <button class="x" onclick="toggleAssistant()">×</button></div>
+      <div class="as-msgs" id="asMsgs"></div>
+      <div class="as-input">
+        <input id="asInput" placeholder='Try: "add a stop in Tulsa, OK"' onkeydown="if(event.key==='Enter')assistantSend()">
+        <button onclick="assistantSend()">Send</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Settings modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head"><h2>⚙ Settings</h2><button class="x" onclick="closeSettings()">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>App / company name</label><input id="s_name" placeholder="TruckRoute Pro"></div>
+      <div class="field"><label>Subtitle</label><input id="s_tag" placeholder="Semi Mileage & Routing"></div>
+      <div class="grid2">
+        <div class="field"><label>Distance units</label>
+          <select id="s_units"><option value="mi">Miles</option><option value="km">Kilometers</option></select></div>
+        <div class="field"><label>Currency symbol</label><input id="s_currency" value="$" maxlength="3"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Theme</label>
+          <select id="s_theme"><option value="dark">Dark</option><option value="light">Light</option></select></div>
+        <div class="field"><label>Default map</label>
+          <select id="s_map"><option value="streets">Road map</option><option value="osm">OpenStreetMap</option><option value="sat">Satellite</option><option value="dark">Dark</option></select></div>
+      </div>
+      <div class="field"><label>Accent color</label>
+        <div class="swatches" id="swatches"></div>
+        <input id="s_accent" type="color" value="#ff9f1c" style="margin-top:9px;width:60px;height:34px;padding:2px">
+      </div>
+      <div class="field"><label>🤖 Local AI (Ollama) URL <span style="color:var(--muted)">— optional, blank = commands only</span></label>
+        <input id="s_ollama" placeholder="http://localhost:11434"></div>
+      <div class="field"><label>Local AI model</label><input id="s_model" placeholder="llama3.2"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="resetAll()">Reset all</button>
+      <button class="btn-primary" onclick="saveSettings()">Save settings</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ============================================================
+   TruckRoute Pro — customizable semi truck routing (single file)
+   ============================================================ */
+const LS='truckroute_v2', LS_PRESETS='truckroute_presets', LS_SET='truckroute_settings';
+let map,routeLayer,markerLayer,statesGeo=null,baseLayers={},lastResult=null,lastStops=null,lastPts=null,lastRoundTrip=false;
+
+const DEFAULT_SETTINGS={name:'TruckRoute Pro',tag:'Semi Mileage & Routing',units:'mi',currency:'$',theme:'dark',map:'streets',accent:'#ff9f1c',ollamaUrl:'',ollamaModel:'llama3.2'};
+let SETTINGS={...DEFAULT_SETTINGS};
+
+/* ---------- US states + major cities ---------- */
+const US_STATES=[["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","Dist. of Columbia"],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"]];
+const US_CITIES={
+AL:["Birmingham","Montgomery","Mobile","Huntsville","Tuscaloosa","Dothan","Auburn","Decatur","Gadsden"],
+AK:["Anchorage","Fairbanks","Juneau","Wasilla","Kenai"],
+AZ:["Phoenix","Tucson","Mesa","Flagstaff","Yuma","Tempe","Scottsdale","Prescott","Kingman"],
+AR:["Little Rock","Fort Smith","Fayetteville","Jonesboro","Texarkana","Pine Bluff","West Memphis"],
+CA:["Los Angeles","San Diego","San Francisco","Sacramento","Fresno","San Bernardino","Oakland","Bakersfield","Stockton","Ontario","Long Beach","Barstow","Redding"],
+CO:["Denver","Colorado Springs","Aurora","Pueblo","Fort Collins","Grand Junction","Greeley","Loveland"],
+CT:["Hartford","New Haven","Bridgeport","Stamford","Waterbury","Danbury"],
+DE:["Wilmington","Dover","Newark","Middletown"],
+DC:["Washington"],
+FL:["Jacksonville","Miami","Tampa","Orlando","Fort Lauderdale","Tallahassee","Fort Myers","Ocala","Pensacola","Lakeland","Gainesville","West Palm Beach"],
+GA:["Atlanta","Savannah","Augusta","Macon","Columbus","Albany","Valdosta","Dalton","Gainesville"],
+HI:["Honolulu","Hilo","Kailua","Kahului"],
+ID:["Boise","Idaho Falls","Nampa","Twin Falls","Pocatello","Coeur d'Alene","Lewiston"],
+IL:["Chicago","Springfield","Peoria","Rockford","Champaign","Bloomington","Joliet","Decatur","Effingham","Rock Island"],
+IN:["Indianapolis","Fort Wayne","Evansville","South Bend","Gary","Terre Haute","Lafayette","Elkhart"],
+IA:["Des Moines","Cedar Rapids","Davenport","Sioux City","Waterloo","Council Bluffs","Dubuque"],
+KS:["Wichita","Kansas City","Topeka","Salina","Dodge City","Garden City","Hays","Lawrence"],
+KY:["Louisville","Lexington","Bowling Green","Paducah","Covington","Elizabethtown","Ashland"],
+LA:["New Orleans","Baton Rouge","Shreveport","Lafayette","Lake Charles","Monroe","Alexandria"],
+ME:["Portland","Bangor","Augusta","Lewiston","Presque Isle"],
+MD:["Baltimore","Hagerstown","Frederick","Annapolis","Salisbury","Cumberland"],
+MA:["Boston","Worcester","Springfield","Lowell","Framingham","New Bedford","Pittsfield"],
+MI:["Detroit","Grand Rapids","Lansing","Flint","Kalamazoo","Saginaw","Battle Creek","Marquette","Gaylord"],
+MN:["Minneapolis","St. Paul","Duluth","Rochester","St. Cloud","Mankato","Moorhead"],
+MS:["Jackson","Gulfport","Hattiesburg","Meridian","Tupelo","Southaven","Greenville"],
+MO:["St. Louis","Kansas City","Springfield","Columbia","Joplin","Cape Girardeau","Jefferson City","Rolla"],
+MT:["Billings","Missoula","Great Falls","Bozeman","Butte","Helena","Kalispell","Miles City"],
+NE:["Omaha","Lincoln","Grand Island","North Platte","Kearney","Norfolk","Scottsbluff"],
+NV:["Las Vegas","Reno","Henderson","Sparks","Elko","Carson City","Winnemucca"],
+NH:["Manchester","Nashua","Concord","Portsmouth","Keene"],
+NJ:["Newark","Jersey City","Trenton","Camden","Atlantic City","Edison","Paterson"],
+NM:["Albuquerque","Las Cruces","Santa Fe","Roswell","Farmington","Gallup","Hobbs","Clovis"],
+NY:["New York","Buffalo","Albany","Rochester","Syracuse","Binghamton","Utica","Watertown","Yonkers"],
+NC:["Charlotte","Raleigh","Greensboro","Durham","Winston-Salem","Fayetteville","Wilmington","Asheville","Greenville"],
+ND:["Fargo","Bismarck","Grand Forks","Minot","Williston","Dickinson"],
+OH:["Columbus","Cleveland","Cincinnati","Toledo","Akron","Dayton","Youngstown","Canton","Lima"],
+OK:["Oklahoma City","Tulsa","Norman","Lawton","Enid","Muskogee","Ardmore"],
+OR:["Portland","Eugene","Salem","Medford","Bend","Pendleton","Klamath Falls"],
+PA:["Philadelphia","Pittsburgh","Harrisburg","Allentown","Erie","Scranton","Reading","Lancaster","Williamsport"],
+RI:["Providence","Warwick","Cranston","Pawtucket"],
+SC:["Columbia","Charleston","Greenville","Spartanburg","Myrtle Beach","Florence","Rock Hill"],
+SD:["Sioux Falls","Rapid City","Aberdeen","Watertown","Mitchell","Pierre"],
+TN:["Nashville","Memphis","Knoxville","Chattanooga","Jackson","Johnson City","Clarksville","Cookeville"],
+TX:["Houston","Dallas","San Antonio","Austin","Fort Worth","El Paso","Laredo","Amarillo","Lubbock","Midland","Corpus Christi","Beaumont","Waco","Abilene","Texarkana"],
+UT:["Salt Lake City","Provo","Ogden","St. George","Logan","Cedar City","Price"],
+VT:["Burlington","Montpelier","Rutland","Brattleboro"],
+VA:["Richmond","Virginia Beach","Norfolk","Roanoke","Bristol","Winchester","Fredericksburg","Lynchburg"],
+WA:["Seattle","Spokane","Tacoma","Vancouver","Yakima","Bellingham","Pasco","Wenatchee"],
+WV:["Charleston","Huntington","Morgantown","Beckley","Wheeling","Martinsburg","Parkersburg"],
+WI:["Milwaukee","Madison","Green Bay","Eau Claire","Wausau","La Crosse","Kenosha","Appleton"],
+WY:["Cheyenne","Casper","Laramie","Rock Springs","Gillette","Sheridan","Evanston"]};
+const ST_ABBR={};US_STATES.forEach(([a,n])=>ST_ABBR[n]=a);ST_ABBR["District of Columbia"]="DC";
+const STATE_NAME={};US_STATES.forEach(([a,n])=>STATE_NAME[a]=n);STATE_NAME.DC="District of Columbia";
+function parseQ(q){q=(q||'').trim();
+  if(/^\d{5}$/.test(q))return {zip:q,st:'',city:'',stateName:''};
+  const m=q.match(/^(.*?),\s*([A-Za-z]{2})(?:\s+(\d{5}))?$/);if(!m)return null;
+  const st=m[2].toUpperCase();if(!STATE_NAME[st])return null;
+  return {city:m[1].trim(),st,stateName:STATE_NAME[st],zip:m[3]||''};}
+const DEFAULT_STOPS=[{st:"IL",city:"Chicago"},{st:"MO",city:"St. Louis"},{st:"TX",city:"Dallas"}];
+const FIELD_IDS=['routeType','t_height','t_length','t_width','t_weight','t_axles','t_trailers','c_mpg','c_diesel','c_pay','c_avoidtolls','orskey','apikey'];
+
+/* ---------- storage helpers (safe if disabled) ---------- */
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+/* ---------- settings ---------- */
+const SWATCHES=['#ff9f1c','#4c9aff','#2ec27e','#e5484d','#a06bff','#ff6ba6','#00c2c7'];
+function applySettings(){
+  document.getElementById('appName').textContent=SETTINGS.name||'TruckRoute Pro';
+  document.getElementById('appTag').textContent=SETTINGS.tag||'';
+  document.title=(SETTINGS.name||'TruckRoute Pro')+' — Truck Routing';
+  document.body.classList.toggle('light',SETTINGS.theme==='light');
+  document.documentElement.style.setProperty('--accent',SETTINGS.accent);
+  document.documentElement.style.setProperty('--accent-2',SETTINGS.accent);
+  document.getElementById('iftaUnit').textContent=SETTINGS.units==='km'?'Km':'Miles';
+  document.getElementById('iftaTitle').textContent='IFTA — Distance by State';
+}
+function openSettings(){
+  document.getElementById('s_name').value=SETTINGS.name;
+  document.getElementById('s_tag').value=SETTINGS.tag;
+  document.getElementById('s_units').value=SETTINGS.units;
+  document.getElementById('s_currency').value=SETTINGS.currency;
+  document.getElementById('s_theme').value=SETTINGS.theme;
+  document.getElementById('s_map').value=SETTINGS.map;
+  document.getElementById('s_accent').value=SETTINGS.accent;
+  document.getElementById('s_ollama').value=SETTINGS.ollamaUrl||'';
+  document.getElementById('s_model').value=SETTINGS.ollamaModel||'llama3.2';
+  renderSwatches();
+  document.getElementById('overlay').classList.add('show');
+}
+function closeSettings(){document.getElementById('overlay').classList.remove('show')}
+function renderSwatches(){
+  const cur=document.getElementById('s_accent').value.toLowerCase();
+  document.getElementById('swatches').innerHTML=SWATCHES.map(c=>
+    `<div class="sw ${c===cur?'on':''}" style="background:${c}" onclick="pickSwatch('${c}')"></div>`).join('');
+}
+function pickSwatch(c){document.getElementById('s_accent').value=c;renderSwatches()}
+function saveSettings(){
+  SETTINGS={
+    name:document.getElementById('s_name').value.trim()||'TruckRoute Pro',
+    tag:document.getElementById('s_tag').value.trim(),
+    units:document.getElementById('s_units').value,
+    currency:document.getElementById('s_currency').value||'$',
+    theme:document.getElementById('s_theme').value,
+    map:document.getElementById('s_map').value,
+    accent:document.getElementById('s_accent').value,
+    ollamaUrl:document.getElementById('s_ollama').value.trim(),
+    ollamaModel:document.getElementById('s_model').value.trim()||'llama3.2'
+  };
+  lsSet(LS_SET,SETTINGS);applySettings();setBaseMap(SETTINGS.map);closeSettings();
+  if(lastResult)showResults(lastResult,lastStops,lastResult._source); // re-render units/currency
+}
+function resetAll(){
+  if(!confirm('Reset everything (settings, saved inputs, presets) to defaults?'))return;
+  try{localStorage.removeItem(LS);localStorage.removeItem(LS_SET);localStorage.removeItem(LS_PRESETS)}catch(e){}
+  SETTINGS={...DEFAULT_SETTINGS};applySettings();closeSettings();location.reload();
+}
+
+/* ---------- persistence of inputs + stops ---------- */
+function saveState(){
+  const s={stops:currentVals(),fields:{},hazmat:selectedHazmat(),roundTrip:document.getElementById('roundTrip').checked};
+  FIELD_IDS.forEach(id=>s.fields[id]=val(id));
+  lsSet(LS,s);
+}
+function restoreState(){
+  const s=lsGet(LS);
+  if(s&&s.fields)FIELD_IDS.forEach(id=>{if(s.fields[id]!=null&&document.getElementById(id))document.getElementById(id).value=s.fields[id]});
+  if(s&&s.hazmat)document.querySelectorAll('#hazmat .chip').forEach(c=>c.classList.toggle('on',s.hazmat.includes(c.dataset.h)));
+  if(s&&typeof s.roundTrip==='boolean')document.getElementById('roundTrip').checked=s.roundTrip;
+  return s&&s.stops&&s.stops.length>=2?s.stops:DEFAULT_STOPS;
+}
+
+/* ---------- truck presets ---------- */
+const TRUCK_FIELDS=['t_height','t_length','t_width','t_weight','t_axles','t_trailers'];
+function presets(){return lsGet(LS_PRESETS)||{}}
+function refreshPresetList(sel){
+  const p=presets();
+  document.getElementById('presetSel').innerHTML='<option value="">Saved presets…</option>'+
+    Object.keys(p).map(n=>`<option ${n===sel?'selected':''}>${n}</option>`).join('');
+}
+function savePreset(){
+  const name=prompt('Name this truck preset (e.g. "53ft Reefer"):');if(!name)return;
+  const p=presets();p[name]={};TRUCK_FIELDS.forEach(f=>p[name][f]=val(f));
+  p[name].hazmat=selectedHazmat();
+  lsSet(LS_PRESETS,p);refreshPresetList(name);
+}
+function loadPreset(){
+  const name=document.getElementById('presetSel').value;if(!name)return;
+  const d=presets()[name];if(!d)return;
+  TRUCK_FIELDS.forEach(f=>{if(d[f]!=null)document.getElementById(f).value=d[f]});
+  document.querySelectorAll('#hazmat .chip').forEach(c=>c.classList.toggle('on',(d.hazmat||[]).includes(c.dataset.h)));
+  saveState();
+}
+function deletePreset(){
+  const name=document.getElementById('presetSel').value;if(!name)return;
+  if(!confirm('Delete preset "'+name+'"?'))return;
+  const p=presets();delete p[name];lsSet(LS_PRESETS,p);refreshPresetList('');
+}
+
+/* ---------- map ---------- */
+function initMap(){
+  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([39.5,-96],4);
+  baseLayers.streets=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd'});
+  baseLayers.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+  baseLayers.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+  baseLayers.dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd'});
+  L.control.layers({"Road map (detailed)":baseLayers.streets,"OpenStreetMap":baseLayers.osm,"Satellite":baseLayers.sat,"Dark":baseLayers.dark},null,{position:'topright'}).addTo(map);
+  routeLayer=L.layerGroup().addTo(map);markerLayer=L.layerGroup().addTo(map);
+  setBaseMap(SETTINGS.map);
+}
+let currentBase=null;
+function setBaseMap(key){
+  if(!baseLayers[key])key='streets';
+  if(currentBase)map.removeLayer(currentBase);
+  currentBase=baseLayers[key];map.addLayer(currentBase);
+}
+
+/* ---------- stops UI ---------- */
+function stateOptions(sel){return '<option value="">State…</option>'+US_STATES.map(([a,n])=>`<option value="${a}" ${a===sel?'selected':''}>${a} — ${n}</option>`).join('')}
+function cityDatalist(st){const list=st?(US_CITIES[st]||[]):[];return list.map(c=>`<option value="${c}">`).join('')}
+function stopRow(v,i,n){
+  const cls=i===0?'first':(i===n-1?'last':'');
+  const label=i===0?'A':(i===n-1?'B':i+1);
+  return `<div class="stop ${cls}">
+    <div class="dot">${label}</div>
+    <div class="selwrap">
+      <select onchange="onStateChange(${i});saveState()" data-role="state">${stateOptions(v.st)}</select>
+      <input data-role="city" list="cl_${i}" placeholder="City" value="${(v.city||'').replace(/"/g,'&quot;')}" onchange="saveState()">
+      <input data-role="zip" placeholder="ZIP" maxlength="5" inputmode="numeric" value="${(v.zip||'').replace(/[^0-9]/g,'')}" onchange="saveState()">
+      <datalist id="cl_${i}" data-role="citylist">${cityDatalist(v.st)}</datalist>
+    </div>
+    <button class="rm" title="Remove" onclick="removeStop(${i})">×</button></div>`;
+}
+function renderStops(vals){
+  document.getElementById('stops').innerHTML=vals.map((v,i)=>{
+    let row=stopRow(v,i,vals.length);
+    if(i<vals.length-1)row+=`<div class="ins"><button onclick="insertStop(${i+1})">＋ insert stop here</button></div>`;
+    return row;
+  }).join('');
+}
+function insertStop(pos){const v=currentVals();v.splice(pos,0,{st:"",city:""});renderStops(v);saveState();}
+function currentVals(){return [...document.querySelectorAll('#stops .stop')].map(row=>{
+  const z=row.querySelector('[data-role=zip]');
+  return {st:row.querySelector('[data-role=state]').value,city:row.querySelector('[data-role=city]').value,zip:(z?z.value:'').trim()};})}
+function stopValid(v){return (!!v.st&&!!v.city)||/^\d{5}$/.test(v.zip||'');}
+function stopLabel(v){
+  if(v.city&&v.st)return v.zip?`${v.city}, ${v.st} ${v.zip}`:`${v.city}, ${v.st}`;
+  if(/^\d{5}$/.test(v.zip||''))return v.zip;
+  return `${v.city}, ${v.st}`;
+}
+function onStateChange(i){
+  const row=[...document.querySelectorAll('#stops .stop')][i];
+  const st=row.querySelector('[data-role=state]').value;
+  row.querySelector('[data-role=citylist]').innerHTML=cityDatalist(st);
+}
+function currentStops(){return currentVals().filter(stopValid).map(stopLabel)}
+function addStop(){const v=currentVals();v.push({st:"",city:""});renderStops(v);saveState()}
+function removeStop(i){let v=currentVals();if(v.length<=2)return;v.splice(i,1);renderStops(v);saveState()}
+
+document.addEventListener('click',e=>{if(e.target.classList.contains('chip')){e.target.classList.toggle('on');saveState()}});
+function selectedHazmat(){return [...document.querySelectorAll('#hazmat .chip.on')].map(c=>c.dataset.h)}
+
+/* ---------- helpers ---------- */
+const R=3958.8;
+function haversine(a,b){const dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;
+  const la1=a[0]*Math.PI/180,la2=b[0]*Math.PI/180;
+  const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const uFactor=()=>SETTINGS.units==='km'?1.60934:1;
+const uLabel=()=>SETTINGS.units==='km'?'km':'mi';
+const fmtNum=m=>m.toLocaleString('en-US',{maximumFractionDigits:0});
+const fmtDist=mi=>fmtNum(mi*uFactor());
+const fmt$=n=>SETTINGS.currency+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtHrs=h=>{const H=Math.floor(h),M=Math.round((h-H)*60);return `${H}h ${M}m`};
+function setStatus(t){document.getElementById('status').classList.add('show');document.getElementById('statusTxt').textContent=t}
+function hideStatus(){document.getElementById('status').classList.remove('show')}
+const val=id=>document.getElementById(id).value;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- spelling correction (fuzzy match to known city list) ---------- */
+function lev(a,b){a=a.toLowerCase();b=b.toLowerCase();const m=a.length,n=b.length;
+  const d=Array.from({length:m+1},(_,i)=>{const row=new Array(n+1).fill(0);row[0]=i;return row});
+  for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){const c=a[i-1]===b[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+c);}
+  return d[m][n];}
+function correctCity(st,city){
+  const list=US_CITIES[st]||[];if(!list.length||!city)return city;
+  const exact=list.find(c=>c.toLowerCase()===city.toLowerCase());if(exact)return exact;
+  let best=null,bd=99;for(const c of list){const d=lev(city,c);if(d<bd){bd=d;best=c;}}
+  const thresh=Math.max(2,Math.ceil(city.length*0.34));
+  return (best&&bd<=thresh)?best:city;
+}
+function writeCorrectedInputs(vals){
+  const rows=[...document.querySelectorAll('#stops .stop')];let k=0;
+  rows.forEach(r=>{const st=r.querySelector('[data-role=state]').value,ci=r.querySelector('[data-role=city]');
+    if(st&&ci.value&&k<vals.length){ci.value=vals[k].city;k++;}});
+  saveState();
+}
+let _toastT;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(_toastT);_toastT=setTimeout(()=>t.classList.remove('show'),5000);}
+
+/* ---------- geocoding ---------- */
+async function geocodeHERE(q,key){
+  const p=parseQ(q);const G='https://geocode.search.hereapi.com/v1/geocode?';
+  let primary;
+  if(p&&p.zip)primary=`${G}qq=${encodeURIComponent('postalCode='+p.zip+';country=USA')}&apiKey=${key}`;      // ZIP = most precise
+  else if(p)primary=`${G}qq=${encodeURIComponent('city='+p.city+';state='+p.st+';country=USA')}&apiKey=${key}`;
+  else primary=`${G}q=${encodeURIComponent(q)}&in=countryCode:USA&apiKey=${key}`;
+  let j=await (await fetch(primary)).json();
+  if((!j.items||!j.items.length)&&p){
+    j=await (await fetch(`${G}q=${encodeURIComponent(q)}&in=countryCode:USA&apiKey=${key}`)).json();
+  }
+  if(!j.items||!j.items.length)throw new Error('Could not find: '+q);
+  let items=j.items;
+  if(p&&p.st&&!p.zip){const m=items.filter(it=>it.address&&it.address.stateCode===p.st);if(m.length)items=m;}
+  const it=items[0];
+  return {lat:it.position.lat,lng:it.position.lng,zip:(it.address&&it.address.postalCode)||(p&&p.zip)||'',label:it.address&&it.address.label||q};
+}
+// choose the populated place in the requested state, ranked by importance — fixes wrong-state / non-town matches
+function pickBestOSM(list,p){
+  if(!Array.isArray(list)||!list.length)return [];
+  const PLACE=new Set(['city','town','village','hamlet','municipality','borough','locality','isolated_dwelling']);
+  const inState=p?list.filter(o=>{const st=o.address&&o.address.state;return st?ST_ABBR[st]===p.st:false;}):list;
+  const pool=inState.length?inState:list;
+  const places=pool.filter(o=>PLACE.has(o.addresstype)||PLACE.has(o.type)||o.class==='place');
+  const chosen=(places.length?places:pool).slice();
+  chosen.sort((a,b)=>(+b.importance||0)-(+a.importance||0));
+  return chosen;
+}
+// classify an OSM place: City vs Town vs Village vs Hamlet, etc.
+function placeType(o){const t=(o.addresstype||o.type||'').toLowerCase();
+  const M={city:'City',town:'Town',village:'Village',hamlet:'Hamlet',municipality:'Municipality',borough:'Borough',locality:'Locality'};
+  return M[t]||(t?t.charAt(0).toUpperCase()+t.slice(1):'Place');}
+async function geocodeOSM(q){
+  const p=parseQ(q);const enc=encodeURIComponent;
+  const run=u=>fetch(u,{headers:{'Accept':'application/json'}}).then(r=>r.json());
+  const base='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&countrycodes=us';
+  let list=[];
+  if(p&&p.zip){                       // ZIP lookup = precise postal-area location
+    let l=await run(`${base}&postalcode=${enc(p.zip)}${p.st?('&state='+enc(p.stateName||'')):''}`);
+    l=Array.isArray(l)?l:[];
+    if(p.st){const inSt=l.filter(o=>{const st=o.address&&o.address.state;return st?ST_ABBR[st]===p.st:true;});if(inSt.length)l=inSt;}
+    l.sort((a,b)=>(+b.importance||0)-(+a.importance||0));list=l;
+  }else if(p){
+    // free-text q returns ALL same-name places across counties -> enables city/town disambiguation
+    list=pickBestOSM(await run(`${base}&q=${enc(p.city+', '+p.stateName)}`),p);
+    if(!list.length)list=pickBestOSM(await run(`${base}&city=${enc(p.city)}&state=${enc(p.stateName)}`),p);
+  }else{
+    const l=await run(`${base}&q=${enc(q)}`);list=Array.isArray(l)?l:[];
+  }
+  if(!list.length)throw new Error('Could not find: '+q);
+  const b=list[0];
+  // distinct same-name places by county+type (the different cities/towns in the state)
+  const seen=new Set();const alts=[];
+  for(const o of list){const county=(o.address&&o.address.county)||'';const key=county+'|'+placeType(o);
+    if(!seen.has(key)){seen.add(key);alts.push({lat:+o.lat,lng:+o.lon,type:placeType(o),county,
+      label:(o.display_name||'').split(',').slice(0,3).join(',').trim()});}}
+  return {lat:+b.lat,lng:+b.lon,zip:(b.address&&b.address.postcode)||(p&&p.zip)||'',
+    type:placeType(b),county:(b.address&&b.address.county)||'',
+    label:(b.display_name||q).split(',').slice(0,3).join(',').trim(),alts};
+}
+
+/* ---------- HERE flexible polyline decoder ---------- */
+const FP={decode(str){
+  const D='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const dec={};for(let i=0;i<D.length;i++)dec[D[i]]=i;
+  let idx=0;
+  function unsigned(){let r=0,s=0,b;do{b=dec[str[idx++]];r|=(b&0x1f)<<s;s+=5}while(b&0x20);return r}
+  function signed(){const v=unsigned();return (v&1)?~(v>>1):(v>>1)}
+  unsigned();const c2=unsigned();const factor=Math.pow(10,c2&0x0f);
+  const res=[];let lat=0,lng=0;
+  while(idx<str.length){lat+=signed();lng+=signed();res.push([lat/factor,lng/factor])}
+  return res;
+}};
+
+/* ---------- IFTA point-in-polygon ---------- */
+function pointInRing(pt,ring){let x=pt[1],y=pt[0],inside=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+    if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))inside=!inside;}return inside}
+function stateForPoint(pt){if(!statesGeo)return null;
+  for(const f of statesGeo.features){const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;
+    for(const poly of polys)if(pointInRing(pt,poly[0]))return f.properties.name;}return null}
+async function loadStates(){
+  if(statesGeo)return;
+  const urls=['https://cdn.jsdelivr.net/gh/PublicaMundi/MappingAPI@master/data/geojson/us-states.json',
+    'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json',
+    'https://raw.githubusercontent.com/python-visualization/folium/main/examples/data/us-states.json'];
+  for(const u of urls){try{const r=await fetch(u);if(!r.ok)continue;const j=await r.json();
+    if(j&&j.features&&j.features.length){statesGeo=j;return}}catch(e){}}statesGeo=null;
+}
+function iftaFromGeometry(coords){const tally={};
+  for(let i=1;i<coords.length;i++){const mid=[(coords[i][0]+coords[i-1][0])/2,(coords[i][1]+coords[i-1][1])/2];
+    const seg=haversine(coords[i-1],coords[i]);const st=stateForPoint(mid)||'Other';tally[st]=(tally[st]||0)+seg;}return tally}
+
+/* ============================================================ MAIN */
+async function calculate(){
+  const vals=currentVals().filter(stopValid);
+  if(vals.length<2){alert('Enter at least an origin and destination — city + state, or a 5-digit ZIP.');return}
+  const stops=vals.map(stopLabel);
+  const orsKey=val('orskey').trim(),hereKey=val('apikey').trim();
+  const engine=orsKey?'ors':(hereKey?'here':'osrm');
+  const badge=document.getElementById('modeBadge');
+  const bm={ors:['FREE','live'],here:['LIVE','live'],osrm:['DEMO','demo']};
+  badge.textContent=bm[engine][0];badge.className='badge '+bm[engine][1];
+  document.getElementById('goBtn').disabled=true;
+  routeLayer.clearLayers();markerLayer.clearLayers();
+  try{
+    setStatus('Loading map data…');await loadStates();
+    setStatus('Finding stops…');
+    const useHereGeo=engine==='here';const pts=[];const fixes=[];
+    const geo=s=>useHereGeo?geocodeHERE(s,hereKey):geocodeOSM(s);
+    for(let i=0;i<stops.length;i++){
+      let pt=null;
+      try{pt=await geo(stops[i]);}                       // 1) honor the city exactly as entered
+      catch(e){                                           // 2) only if it truly isn't findable, try a spelling fix
+        const v=vals[i],fixed=correctCity(v.st,v.city);
+        if(fixed&&fixed.toLowerCase()!==v.city.toLowerCase()){
+          const alt=`${fixed}, ${v.st}`;
+          try{pt=await geo(alt);fixes.push(`${v.city} → ${fixed}`);v.city=fixed;stops[i]=alt;}catch(_){}
+        }
+      }
+      if(!pt)throw new Error(`Couldn't find "${stops[i]}" on the map — check the city name and state.`);
+      pts.push(pt);
+      if(!useHereGeo)await sleep(1100);
+    }
+    if(fixes.length){writeCorrectedInputs(vals);showToast('Not found as typed, used: '+fixes.join(',  '));}
+    // round trip: append the origin as a final destination so the route returns to start
+    const roundTrip=document.getElementById('roundTrip').checked;
+    if(roundTrip){pts.push(pts[0]);stops.push(stops[0]);}
+    lastPts=pts;lastStops=stops;lastRoundTrip=roundTrip;
+    await routeAndRender();
+  }catch(err){hideStatus();alert('Routing error: '+err.message);}
+  finally{document.getElementById('goBtn').disabled=false;hideStatus();}
+}
+/* route from the stored coordinates (used by first calc AND after a pin is dragged) */
+async function routeAndRender(){
+  const orsKey=val('orskey').trim(),hereKey=val('apikey').trim();
+  const engine=orsKey?'ors':(hereKey?'here':'osrm');
+  const badge=document.getElementById('modeBadge');const bm={ors:['FREE','live'],here:['LIVE','live'],osrm:['DEMO','demo']};
+  badge.textContent=bm[engine][0];badge.className='badge '+bm[engine][1];
+  routeLayer.clearLayers();markerLayer.clearLayers();
+  setStatus(engine==='osrm'?'Following roads & highways…':'Routing truck-legal roads…');
+  let result,source;
+  if(engine==='ors'){result=await routeORS(lastPts,orsKey);source='OpenRouteService (free truck)';}
+  else if(engine==='here'){result=await routeHERE(lastPts,hereKey);source='HERE truck maps';}
+  else{try{result=await routeOSRM(lastPts);source='OpenStreetMap road network';}
+    catch(e){result=routeDemo(lastPts);source='straight-line estimate';}}
+  result._alts=result._alts||[result]; // ensure an options list exists even for single-route engines
+  drawRoute(result,lastPts,lastStops,lastRoundTrip);
+  showResults(result,lastStops,source,lastRoundTrip);
+  hideStatus();
+}
+function hereRoutingMode(){return val('routeType')==='shortest'?'short':'fast'}
+
+async function routeORS(pts,key){
+  const ft2m=f=>+(f*0.3048).toFixed(2),lb2t=l=>+(l*0.000453592).toFixed(2);const axles=+val('t_axles')||5;
+  const body={coordinates:pts.map(p=>[p.lng,p.lat]),preference:val('routeType')==='shortest'?'shortest':'recommended',instructions:true,
+    options:{vehicle_type:'hgv',profile_params:{restrictions:{height:ft2m(+val('t_height')),width:ft2m(+val('t_width')),
+      length:ft2m(+val('t_length')),weight:lb2t(+val('t_weight')),axleload:+(lb2t(+val('t_weight'))/axles).toFixed(2)}}}};
+  if(selectedHazmat().length)body.options.profile_params.restrictions.hazmat=true;
+  if(val('c_avoidtolls')==='yes')body.options.avoid_features=['tollways'];
+  if(pts.length===2)body.alternative_routes={target_count:3,share_factor:0.6,weight_factor:1.6}; // ORS alts: point-to-point only
+  const r=await fetch('https://api.openrouteservice.org/v2/directions/driving-hgv/geojson',{
+    method:'POST',headers:{'Authorization':key,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json();
+  if(!j.features||!j.features.length)throw new Error((j.error&&(j.error.message||j.error))||'No truck-legal route found');
+  const routes=j.features.map(buildORS);const best=routes[0];best._alts=routes;return best;
+}
+function buildORS(f){
+  const coords=f.geometry.coordinates.map(c=>[c[1],c[0]]);
+  const miles=f.properties.summary.distance/1609.34;
+  const legMiles=(f.properties.segments||[]).map(s=>s.distance/1609.34);
+  const steps=[];(f.properties.segments||[]).forEach((seg,li)=>(seg.steps||[]).forEach(s=>{
+    steps.push({leg:li,road:(s.name&&s.name!=='-')?s.name:'',instruction:s.instruction||'',miles:s.distance/1609.34,
+      exit:(s.exit_number!=null&&s.exit_number!=='')?String(s.exit_number):'',toward:''});}));
+  const toll=val('c_avoidtolls')==='yes'?0:miles*0.06;
+  return {coords,miles,hours:f.properties.summary.duration/3600,tollCost:toll,legMiles,steps,ifta:iftaFromGeometry(coords)};
+}
+async function routeOSRM(pts){
+  const coordStr=pts.map(p=>`${p.lng},${p.lat}`).join(';');
+  const u=`https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson&steps=true&alternatives=3`;
+  const r=await fetch(u);const j=await r.json();
+  if(j.code!=='Ok'||!j.routes||!j.routes.length)throw new Error(j.message||'No road route found');
+  const routes=j.routes.map(buildOSRM);const best=routes[0];best._alts=routes;return best;
+}
+function buildOSRM(route){
+  const coords=route.geometry.coordinates.map(c=>[c[1],c[0]]);
+  const miles=route.distance/1609.34;const legMiles=(route.legs||[]).map(l=>l.distance/1609.34);
+  const steps=[];(route.legs||[]).forEach((leg,li)=>(leg.steps||[]).forEach(s=>{
+    const toward=Array.isArray(s.destinations)?s.destinations.join(', '):(s.destinations||'');
+    steps.push({leg:li,road:s.name||s.ref||'',instruction:osrmInstr(s),miles:s.distance/1609.34,exit:s.exits||'',toward});}));
+  const toll=val('c_avoidtolls')==='yes'?0:miles*0.06;
+  return {coords,miles,hours:route.duration/3600,tollCost:toll,legMiles,steps,ifta:iftaFromGeometry(coords)};
+}
+function osrmInstr(s){const m=s.maneuver||{};const road=s.name||s.ref||'the road';
+  if(m.type==='arrive')return 'Arrive at stop';if(m.type==='depart')return 'Depart on '+road;
+  const mod=m.modifier?' '+m.modifier:'';
+  const v={turn:'Turn'+mod+' onto',merge:'Merge'+mod+' onto','on ramp':'Take the ramp onto','off ramp':'Take exit toward',
+    fork:'Keep'+mod+' onto','new name':'Continue onto','end of road':'Turn'+mod+' onto',roundabout:'At roundabout, take',
+    rotary:'At rotary, take',continue:'Continue'+mod+' on'}[m.type]||'Continue on';
+  return `${v} ${road}`.replace(/\s+/g,' ').trim();}
+function routeDemo(pts){
+  const rt=val('routeType');const ROAD=rt==='shortest'?1.11:1.18;const SPEED=rt==='fastest'?60:(rt==='shortest'?50:55);
+  let coords=[],miles=0,legMiles=[];
+  for(let i=1;i<pts.length;i++){const a=[pts[i-1].lat,pts[i-1].lng],b=[pts[i].lat,pts[i].lng];const steps=60,leg=[];
+    for(let s=0;s<=steps;s++)leg.push([a[0]+(b[0]-a[0])*s/steps,a[1]+(b[1]-a[1])*s/steps]);
+    coords=coords.concat(leg);const lm=haversine(a,b)*ROAD;legMiles.push(lm);miles+=lm;}
+  const toll=val('c_avoidtolls')==='yes'?0:miles*0.06;
+  return {coords,miles,hours:miles/SPEED,tollCost:toll,legMiles,ifta:iftaFromGeometry(coords)};
+}
+async function routeHERE(pts,key){
+  const p=new URLSearchParams();
+  p.set('transportMode','truck');p.set('routingMode',hereRoutingMode());
+  p.set('origin',`${pts[0].lat},${pts[0].lng}`);p.set('destination',`${pts[pts.length-1].lat},${pts[pts.length-1].lng}`);
+  for(let i=1;i<pts.length-1;i++)p.append('via',`${pts[i].lat},${pts[i].lng}`);
+  const ft2cm=f=>Math.round(f*30.48),lb2kg=l=>Math.round(l*0.453592);
+  p.set('truck[height]',ft2cm(+val('t_height')));p.set('truck[width]',ft2cm(+val('t_width')));
+  p.set('truck[length]',ft2cm(+val('t_length')));p.set('truck[grossWeight]',lb2kg(+val('t_weight')));
+  p.set('truck[axleCount]',val('t_axles'));
+  const haz=selectedHazmat();if(haz.length)p.set('truck[shippedHazardousGoods]',haz.join(','));
+  if(val('c_avoidtolls')==='yes')p.set('avoid[features]','tollRoad');
+  p.set('return','polyline,summary,travelSummary,tolls,actions');p.set('alternatives','2');p.set('apiKey',key);
+  const r=await fetch('https://router.hereapi.com/v8/routes?'+p.toString());const j=await r.json();
+  if(!j.routes||!j.routes.length)throw new Error(j.title||'No truck-legal route found');
+  const routes=j.routes.map(buildHERE);const best=routes[0];best._alts=routes;return best;
+}
+function buildHERE(route){
+  let coords=[],miles=0,secs=0,tollCost=0,legMiles=[],steps=[];
+  route.sections.forEach((sec,li)=>{coords=coords.concat(FP.decode(sec.polyline));
+    const legMi=(sec.travelSummary?.length||sec.summary?.length||0)/1609.34;legMiles.push(legMi);miles+=legMi;
+    secs+=(sec.travelSummary?.duration||sec.summary?.duration||0);
+    if(sec.tolls)for(const t of sec.tolls)for(const f of (t.fares||[]))tollCost+=(f.price?.value||0);
+    (sec.actions||[]).forEach(a=>steps.push({leg:li,road:'',instruction:a.instruction||a.action||'',miles:(a.length||0)/1609.34}));});
+  return {coords,miles,hours:secs/3600,tollCost,legMiles,steps,ifta:iftaFromGeometry(coords)};
+}
+
+/* ---------- draw ---------- */
+function drawRoute(res,pts,stops,roundTrip){
+  // faint, clickable alternative routes underneath the active one
+  const alts=res._alts||[res];
+  alts.forEach((alt,idx)=>{if(alt===res)return;
+    const gl=L.polyline(alt.coords,{color:'#8b96a5',weight:5,opacity:.5}).addTo(routeLayer);
+    gl.on('mouseover',()=>gl.setStyle({opacity:.85,color:'#c0cad6',weight:6}));
+    gl.on('mouseout',()=>gl.setStyle({opacity:.5,color:'#8b96a5',weight:5}));
+    gl.on('click',()=>selectRoute(idx));
+    gl.bindTooltip(`Alternate: ${fmtDist(alt.miles)} ${uLabel()} · ${fmtHrs(alt.hours)} — click to use`,{sticky:true});});
+  L.polyline(res.coords,{color:'#ff7b00',weight:12,opacity:.22}).addTo(routeLayer);
+  L.polyline(res.coords,{color:'#fff',weight:8,opacity:.55}).addTo(routeLayer);
+  const line=L.polyline(res.coords,{color:SETTINGS.accent,weight:4.5,opacity:1}).addTo(routeLayer);
+  line.bindTooltip('Drag the line to add a waypoint',{sticky:true,opacity:0.9});
+  line.on('mousedown',startLineDrag);
+  // for a round trip the last point equals the origin — don't draw a second marker on top of A
+  const markerPts=roundTrip?pts.slice(0,-1):pts;
+  markerPts.forEach((p,i)=>{const isA=i===0,isB=!roundTrip&&i===markerPts.length-1;
+    const color=isA?'#2ec27e':(isB?'#e5484d':'#ffbf69');const label=isA?'A':(isB?'B':i+1);
+    const resolved=p.label&&p.label.toLowerCase()!==stops[i].toLowerCase()?`<br><span style="color:#8b96a5;font-size:11px">${escapeHtml(p.label)}</span>`:'';
+    const zipStr=p.zip&&!String(stops[i]).includes(p.zip)?` <span style="color:#8b96a5;font-size:11px">· ZIP ${escapeHtml(p.zip)}</span>`:'';
+    const tc=[p.type,p.county].filter(Boolean).join(' · ');
+    const tcStr=tc?`<br><span style="color:#8b96a5;font-size:11px">${escapeHtml(tc)}</span>`:'';
+    const tip=`<b>${escapeHtml(stops[i])}</b>${zipStr}${isA&&roundTrip?' (start &amp; end)':''}${tcStr}${resolved}`;
+    // teardrop pin: tip anchored EXACTLY on the geocoded coordinate (tip sits at 15,37 within the icon box)
+    const ic=L.divIcon({className:'',html:`<div style="background:${color};width:30px;height:30px;border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);box-shadow:0 3px 8px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;cursor:grab">
+      <span style="transform:rotate(45deg);color:#0e1116;font-weight:800;font-size:13px">${label}</span></div>`,iconSize:[30,44],iconAnchor:[15,37]});
+    const mk=L.marker([p.lat,p.lng],{icon:ic,draggable:true,autoPan:true}).addTo(markerLayer);
+    mk.bindTooltip(tip+'<br><span style="color:#8b96a5;font-size:10px">drag to move &amp; reroute</span>',{direction:'top',offset:[0,-34]});
+    mk.on('dragend',()=>onMarkerDrag(i,mk));
+    // precise ground-truth dot exactly at the entered city's true coordinate
+    L.circleMarker([p.lat,p.lng],{radius:2.5,color:'#111',weight:1,fillColor:'#fff',fillOpacity:1,interactive:false}).addTo(markerLayer);});
+  map.fitBounds(line.getBounds(),{padding:[80,380]});
+}
+/* dragging a pin: update that point, reverse-geocode a label, and reroute live */
+async function onMarkerDrag(i,mk){
+  const ll=mk.getLatLng();
+  lastPts[i]={lat:ll.lat,lng:ll.lng};
+  if(lastRoundTrip&&i===0)lastPts[lastPts.length-1]={lat:ll.lat,lng:ll.lng}; // origin doubles as return point
+  setStatus('Updating route…');
+  try{const g=await reverseGeocode(ll.lat,ll.lng);
+    if(g.city&&g.st){lastStops[i]=`${g.city}, ${g.st}`;
+      if(lastRoundTrip&&i===0)lastStops[lastStops.length-1]=lastStops[i];
+      updateStopInput(i,g.st,g.city,g.zip);}
+    else{lastStops[i]='Dropped pin';if(lastRoundTrip&&i===0)lastStops[lastStops.length-1]='Dropped pin';}
+  }catch(e){lastStops[i]='Dropped pin';}
+  await routeAndRender();
+}
+async function reverseGeocode(lat,lng){
+  const u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+  const r=await fetch(u,{headers:{'Accept':'application/json'}});const j=await r.json();
+  const a=j.address||{};const city=a.city||a.town||a.village||a.hamlet||a.county||'';
+  const st=ST_ABBR[a.state]||'';return {city,st,zip:a.postcode||'',label:j.display_name||''};
+}
+function updateStopInput(i,st,city,zip){
+  const rows=[...document.querySelectorAll('#stops .stop')];let k=0;
+  for(const r of rows){const sEl=r.querySelector('[data-role=state]'),cEl=r.querySelector('[data-role=city]'),zEl=r.querySelector('[data-role=zip]');
+    if(sEl.value&&cEl.value){if(k===i){if(st){sEl.value=st;r.querySelector('[data-role=citylist]').innerHTML=cityDatalist(st);}cEl.value=city||cEl.value;if(zEl&&zip)zEl.value=zip;break;}k++;}}
+  saveState();
+}
+
+/* ---------- drag the route LINE to drop a new waypoint (Google-Maps style) ---------- */
+let _lineDrag={on:false,tmp:null,leg:0};
+function viaGhostIcon(){return L.divIcon({className:'',iconSize:[18,18],iconAnchor:[9,9],
+  html:`<div style="width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid ${SETTINGS.accent};box-shadow:0 2px 6px rgba(0,0,0,.45)"></div>`});}
+function distToSeg(p,a,b){const x=p.lng,y=p.lat,x1=a.lng,y1=a.lat,x2=b.lng,y2=b.lat;
+  const dx=x2-x1,dy=y2-y1;const len2=dx*dx+dy*dy||1e-9;let t=((x-x1)*dx+(y-y1)*dy)/len2;t=Math.max(0,Math.min(1,t));
+  const px=x1+t*dx,py=y1+t*dy;return Math.hypot(x-px,y-py);}
+function nearestLeg(ll){let best=0,bd=Infinity;for(let i=0;i<lastPts.length-1;i++){const d=distToSeg(ll,lastPts[i],lastPts[i+1]);if(d<bd){bd=d;best=i;}}return best;}
+function startLineDrag(e){
+  if(!lastPts||lastPts.length<2)return;
+  _lineDrag.on=true;_lineDrag.leg=nearestLeg(e.latlng);
+  try{map.dragging.disable();}catch(_){}
+  _lineDrag.tmp=L.marker(e.latlng,{icon:viaGhostIcon(),interactive:false}).addTo(markerLayer);
+  map.on('mousemove',onLineDragMove);map.on('mouseup',endLineDrag);
+  if(L.DomEvent&&L.DomEvent.stop)L.DomEvent.stop(e);
+}
+function onLineDragMove(e){if(_lineDrag.tmp)_lineDrag.tmp.setLatLng(e.latlng);}
+async function endLineDrag(e){
+  map.off('mousemove',onLineDragMove);map.off('mouseup',endLineDrag);try{map.dragging.enable();}catch(_){}
+  if(!_lineDrag.on)return;_lineDrag.on=false;
+  if(_lineDrag.tmp){markerLayer.removeLayer(_lineDrag.tmp);_lineDrag.tmp=null;}
+  await insertViaAt(_lineDrag.leg,e.latlng.lat,e.latlng.lng);
+}
+async function insertViaAt(leg,lat,lng){
+  setStatus('Adding waypoint…');
+  lastPts.splice(leg+1,0,{lat,lng});
+  let label='Waypoint';
+  try{const g=await reverseGeocode(lat,lng);if(g.city&&g.st)label=`${g.city}, ${g.st}`;}catch(_){}
+  lastStops.splice(leg+1,0,label);
+  insertSidebarStop(leg+1,label);
+  showToast('Waypoint added: '+label);
+  await routeAndRender();
+}
+function insertSidebarStop(pos,label){
+  const p=parseQ(label);const v=currentVals();
+  const realPos=Math.min(pos,v.length);
+  v.splice(realPos,0,{st:p?p.st:'',city:p?p.city:label});
+  renderStops(v);saveState();
+}
+/* force-refresh all live data: map tiles, road/boundary data, and the route itself */
+async function updateData(){
+  statesGeo=null; // drop cached IFTA boundaries so they reload fresh
+  Object.values(baseLayers).forEach(l=>{try{if(l&&l.redraw)l.redraw();}catch(e){}}); // re-fetch map tiles from server
+  if(lastStops&&lastStops.length>=2){
+    showToast('Refreshing maps, roads & routes from live providers…');
+    await calculate(); // re-geocode + re-route for the latest miles and roads
+    showToast('Updated — maps, roads and route pulled fresh just now.');
+  }else{
+    await loadStates();
+    showToast('Map tiles and road data refreshed. Calculate a route to pull the latest miles.');
+  }
+}
+function clearRoute(){routeLayer.clearLayers();markerLayer.clearLayers();
+  document.getElementById('results').classList.remove('show');document.getElementById('empty').style.display='block';
+  map.setView([39.5,-96],4);lastResult=null;}
+
+/* ---------- results ---------- */
+const RT_LABEL={practical:"Practical route",shortest:"Shortest route",fastest:"Fastest route"};
+function showResults(res,stops,source,roundTrip){
+  roundTrip=(roundTrip!==undefined)?roundTrip:res._roundTrip;res._roundTrip=roundTrip;
+  res._source=source;lastResult=res;lastStops=stops;
+  document.getElementById('empty').style.display='none';
+  document.getElementById('results').classList.add('show');
+  document.getElementById('routeName').textContent=roundTrip?(stops[0]+' — round trip'):(stops[0]+' → '+stops[stops.length-1]);
+  document.getElementById('rtTag').textContent=RT_LABEL[val('routeType')]+(roundTrip?' · round trip':'');
+  document.getElementById('totalMiles').innerHTML=fmtDist(res.miles)+' <span>'+uLabel()+'</span>';
+  document.getElementById('kDrive').textContent=fmtHrs(res.hours);
+  document.getElementById('kToll').textContent=fmt$(res.tollCost);
+  const gal=res.miles/(+val('c_mpg')||6.5),fuel=gal*(+val('c_diesel')||0),pay=res.miles*(+val('c_pay')||0);
+  document.getElementById('kFuel').innerHTML=fmt$(fuel)+' <small>'+gal.toFixed(0)+' gal</small>';
+  document.getElementById('kTotal').textContent=fmt$(res.tollCost+fuel+pay);
+  const mph=res.miles/res.hours;
+  document.getElementById('legs').innerHTML=res.legMiles.map((m,i)=>`<div class="leg">
+    <div><div class="lg-from">${stops[i]} → ${stops[i+1]}</div><div class="lg-sub">${fmtHrs(m/mph)}</div></div>
+    <div class="lg-mi">${fmtDist(m)} ${uLabel()}</div></div>`).join('');
+  document.getElementById('iftaUnit').textContent=uLabel()==='km'?'Km':'Miles';
+  const iftaTotal=Object.values(res.ifta).reduce((s,v)=>s+v,0)||1;const scale=res.miles/iftaTotal;
+  const rows=Object.entries(res.ifta).map(([st,mi])=>[st,mi*scale]).filter(([k,v])=>k!=='Other'||v>1).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('iftaBody').innerHTML=rows.map(([st,mi])=>`<tr>
+    <td class="st">${ST_ABBR[st]||st}</td><td>${fmtDist(mi)}</td><td>${(mi/res.miles*100).toFixed(1)}%</td></tr>`).join('')
+    ||'<tr><td colspan="3" style="color:var(--muted)">State data unavailable</td></tr>';
+  renderDirections(res,stops);
+  renderHighways(res);
+  renderRouteOptions(res);
+  renderStopChoices();
+  document.getElementById('updated').innerHTML=`Data pulled live from ${source} · <b>${new Date().toLocaleString()}</b>`;
+}
+function renderRouteOptions(res){
+  const el=document.getElementById('routeOpts');const alts=res._alts||[res];
+  if(alts.length<2){el.innerHTML='';el.style.display='none';return;}
+  el.style.display='block';
+  // rank labels: shortest distance & fastest time get badges
+  const minMi=Math.min(...alts.map(a=>a.miles)),minHr=Math.min(...alts.map(a=>a.hours));
+  el.innerHTML='<div class="opt-lead">Route options ('+alts.length+')</div>'+alts.map((a,i)=>{
+    const sel=a===res;const tags=[];if(a.miles===minMi)tags.push('shortest');if(a.hours===minHr)tags.push('fastest');
+    return `<div class="opt ${sel?'sel':''}" onclick="selectRoute(${i})">
+      <div class="opt-i">${sel?'●':'○'}</div>
+      <div class="opt-main">Option ${i+1}${tags.length?' · '+tags.join(' · '):''}
+        <div class="opt-sub">${fmtHrs(a.hours)} · tolls ${fmt$(a.tollCost)}</div></div>
+      <div class="opt-mi">${fmtDist(a.miles)} ${uLabel()}</div></div>`;}).join('');
+}
+// when a city name matches multiple places in the state, let the user pick the right city/town
+function renderStopChoices(){
+  const el=document.getElementById('stopChoices');if(!el)return;
+  if(!lastPts){el.innerHTML='';el.style.display='none';return;}
+  const n=lastRoundTrip?lastPts.length-1:lastPts.length;let html='';
+  for(let i=0;i<n;i++){const pt=lastPts[i];if(!pt||!pt.alts||pt.alts.length<2)continue;
+    html+=`<div class="opt-lead">Which “${escapeHtml(lastStops[i])}”? ${pt.alts.length} places match</div>`;
+    pt.alts.forEach((a,ai)=>{const sel=Math.abs(a.lat-pt.lat)<1e-6&&Math.abs(a.lng-pt.lng)<1e-6;
+      html+=`<div class="opt ${sel?'sel':''}" onclick="chooseStopLoc(${i},${ai})">
+        <div class="opt-i">${sel?'●':'○'}</div>
+        <div class="opt-main">${escapeHtml(a.type)}${a.county?' · '+escapeHtml(a.county):''}
+          <div class="opt-sub">${escapeHtml(a.label)}</div></div></div>`;});
+  }
+  el.innerHTML=html;el.style.display=html?'block':'none';
+}
+async function chooseStopLoc(i,ai){
+  const pt=lastPts[i];if(!pt||!pt.alts||!pt.alts[ai])return;const a=pt.alts[ai];
+  lastPts[i]=Object.assign({},pt,{lat:a.lat,lng:a.lng,type:a.type,county:a.county,label:a.label});
+  if(lastRoundTrip&&i===0)lastPts[lastPts.length-1]=Object.assign({},lastPts[i]);
+  showToast(`Using ${a.type}${a.county?' in '+a.county:''} for ${lastStops[i]}`);
+  await routeAndRender();
+}
+function selectRoute(i){
+  const alts=lastResult&&lastResult._alts;if(!alts||!alts[i])return;
+  const chosen=alts[i];chosen._alts=alts;chosen._roundTrip=lastRoundTrip;
+  routeLayer.clearLayers();markerLayer.clearLayers();
+  drawRoute(chosen,lastPts,lastStops,lastRoundTrip);
+  showResults(chosen,lastStops,lastResult._source,lastRoundTrip);
+}
+/* extract the major highways/interstates a route follows, in travel order */
+const HWY_RE=/(\bI[- ]?\d+\b|\bIH[- ]?\d+\b|\bUS[- ]?\d+\b|\bU\.S\.[- ]?\d+\b|\bSR[- ]?\d+\b|\bState (Route|Hwy|Highway)\b|\bHwy\b|\bHighway\b|\bRoute\s?\d+\b|\b[A-Z]{1,3}[- ]?\d+\b|\bTurnpike\b|\bTollway\b|\bFreeway\b|\bExpressway\b|\bParkway\b|\bBeltway\b)/i;
+function summarizeHighways(steps){
+  if(!steps||!steps.length)return [];
+  const seq=[];
+  steps.forEach(s=>{const rd=(s.road||'').trim();if(!rd)return;
+    if(seq.length&&seq[seq.length-1].road===rd)seq[seq.length-1].miles+=(s.miles||0);
+    else seq.push({road:rd,miles:(s.miles||0)});});
+  const majors=seq.filter(x=>HWY_RE.test(x.road)||x.miles>=8);
+  const seen=new Set(),out=[];
+  majors.forEach(x=>{if(!seen.has(x.road)){seen.add(x.road);out.push(x.road);}});
+  return out;
+}
+function renderHighways(res){
+  const el=document.getElementById('hwyStrip');
+  const hwys=summarizeHighways(res.steps);
+  if(!hwys.length){el.innerHTML='';el.style.display='none';return;}
+  el.style.display='flex';
+  el.innerHTML='<div class="lead">Highways on this route</div>'+
+    hwys.map((h,i)=>`${i?'<span class="hwy-arrow">›</span>':''}<span class="hwy-chip">${escapeHtml(h)}</span>`).join('');
+}
+function stepExtra(st){return [st.exit?('exit '+escapeHtml(st.exit)):'',st.toward?('toward '+escapeHtml(st.toward)):''].filter(Boolean).join(' · ');}
+function renderDirections(res,stops){
+  const el=document.getElementById('dirList'),tog=document.getElementById('dirToggle');
+  if(!res.steps||!res.steps.length){el.innerHTML='<div class="dir"><div class="txt" style="color:var(--muted)">Turn-by-turn isn\'t available for this engine — use the default (OpenStreetMap) or OpenRouteService.</div></div>';
+    el.style.display='none';tog.style.display='none';return;}
+  tog.style.display='';
+  const byLeg={};res.steps.forEach(st=>{(byLeg[st.leg]=byLeg[st.leg]||[]).push(st)});
+  let html='';
+  Object.keys(byLeg).map(Number).sort((a,b)=>a-b).forEach(li=>{
+    html+=`<div class="dir-leg">${escapeHtml((stops[li]||'Stop')+' → '+(stops[li+1]||'End'))}</div>`;
+    let n=1;byLeg[li].forEach(st=>{const extra=stepExtra(st);
+      html+=`<div class="dir"><div class="num">${n++}</div>
+        <div class="txt">${escapeHtml(st.instruction||('Continue on '+(st.road||'road')))}${extra?`<div class="rd">${extra}</div>`:''}</div>
+        <div class="mi">${st.miles>=0.05?fmtDist(st.miles)+' '+uLabel():''}</div></div>`;});
+  });
+  el.innerHTML=html;el.style.display='none';tog.textContent='show ▸';
+}
+function toggleDirections(){const el=document.getElementById('dirList'),t=document.getElementById('dirToggle');
+  const show=el.style.display==='none';el.style.display=show?'block':'none';t.textContent=show?'hide ▾':'show ▸';}
+
+/* ---------- print trip sheet ---------- */
+function printSheet(){
+  if(!lastResult){alert('Calculate a route first.');return}
+  const r=lastResult,s=lastStops,gal=r.miles/(+val('c_mpg')||6.5),fuel=gal*(+val('c_diesel')||0),pay=r.miles*(+val('c_pay')||0);
+  const iftaTotal=Object.values(r.ifta).reduce((a,v)=>a+v,0)||1,scale=r.miles/iftaTotal;
+  const rows=Object.entries(r.ifta).map(([st,mi])=>[st,mi*scale]).filter(([k,v])=>k!=='Other'||v>1).sort((a,b)=>b[1]-a[1]);
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Trip Sheet</title><style>
+    body{font-family:Arial;padding:30px;color:#111}h1{margin:0 0 4px}h2{font-size:14px;color:#666;margin:0 0 20px;font-weight:400}
+    table{width:100%;border-collapse:collapse;margin:10px 0 24px}td,th{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}
+    th{background:#f3f3f3}.kpi{display:inline-block;margin:0 26px 10px 0}.kpi b{font-size:20px}</style></head><body>
+    <h1>${SETTINGS.name}</h1><h2>Trip Sheet — ${new Date().toLocaleString()}</h2>
+    <p><b>Route:</b> ${s.join('  →  ')}<br><b>Route type:</b> ${RT_LABEL[val('routeType')]}${(()=>{const h=summarizeHighways(r.steps);return h.length?`<br><b>Highways:</b> ${escapeHtml(h.join(' · '))}`:'';})()}</p>
+    <div><span class="kpi">Distance<br><b>${fmtDist(r.miles)} ${uLabel()}</b></span>
+    <span class="kpi">Drive time<br><b>${fmtHrs(r.hours)}</b></span>
+    <span class="kpi">Tolls<br><b>${fmt$(r.tollCost)}</b></span>
+    <span class="kpi">Fuel (${gal.toFixed(0)} gal)<br><b>${fmt$(fuel)}</b></span>
+    <span class="kpi">Total cost<br><b>${fmt$(r.tollCost+fuel+pay)}</b></span></div>
+    <h3>Legs</h3><table><tr><th>From → To</th><th>${uLabel()}</th></tr>
+    ${r.legMiles.map((m,i)=>`<tr><td>${s[i]} → ${s[i+1]}</td><td>${fmtDist(m)}</td></tr>`).join('')}</table>
+    <h3>IFTA — Distance by State</h3><table><tr><th>State</th><th>${uLabel()}</th><th>%</th></tr>
+    ${rows.map(([st,mi])=>`<tr><td>${ST_ABBR[st]||st}</td><td>${fmtDist(mi)}</td><td>${(mi/r.miles*100).toFixed(1)}%</td></tr>`).join('')}</table>
+    <p style="color:#888;font-size:11px">Generated by ${SETTINGS.name}. Source: ${r._source}.</p>
+    </body></html>`);
+  w.document.close();w.focus();setTimeout(()=>w.print(),400);
+}
+function escapeHtml(s){return (s||'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---------- road-by-road (turn-by-turn) directions sheet ---------- */
+function directionsSheet(){
+  if(!lastResult){alert('Calculate a route first, then open the road-by-road sheet.');return}
+  const r=lastResult,s=lastStops;
+  if(!r.steps||!r.steps.length){
+    alert('Turn-by-turn directions are generated by the OpenStreetMap engine (default, no key) and OpenRouteService. Recalculate the route to build a road-by-road sheet.');return;}
+  const byLeg={};r.steps.forEach(st=>{(byLeg[st.leg]=byLeg[st.leg]||[]).push(st)});
+  let body='';
+  Object.keys(byLeg).map(Number).sort((a,b)=>a-b).forEach(li=>{
+    const from=s[li]||('Stop '+(li+1)),to=s[li+1]||'Destination';
+    body+=`<h3>Leg ${li+1}: ${escapeHtml(from)} → ${escapeHtml(to)}</h3><table><tr><th>#</th><th>Directions</th><th>${uLabel()}</th></tr>`;
+    let n=1;
+    byLeg[li].forEach(st=>{
+      const instr=escapeHtml(st.instruction||('Continue on '+(st.road||'road')));
+      const rd=(st.road&&!(st.instruction||'').includes(st.road))?` <span class="rd">(${escapeHtml(st.road)})</span>`:'';
+      const extra=stepExtra(st);const ex=extra?` <span class="rd">· ${extra}</span>`:'';
+      body+=`<tr><td>${n++}</td><td>${instr}${rd}${ex}</td><td>${st.miles>=0.05?fmtDist(st.miles):'—'}</td></tr>`;});
+    body+=`</table>`;
+  });
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Road-by-Road Directions</title><style>
+    body{font-family:Arial;padding:30px;color:#111}h1{margin:0 0 4px}h2{font-size:13px;color:#666;margin:0 0 16px;font-weight:400}
+    h3{margin:22px 0 6px;font-size:15px;border-bottom:2px solid #ff8f00;padding-bottom:4px}
+    table{width:100%;border-collapse:collapse;margin:6px 0 10px}td,th{border:1px solid #ccc;padding:7px;font-size:12.5px;text-align:left;vertical-align:top}
+    th{background:#f3f3f3}td:first-child,th:first-child{width:34px;text-align:center}td:last-child,th:last-child{width:78px;text-align:right}
+    .rd{color:#888}.btn{margin-bottom:6px;padding:9px 16px;background:#ff8f00;border:none;border-radius:6px;font-weight:700;cursor:pointer}
+    @media print{.btn{display:none}}</style></head><body>
+    <h1>${escapeHtml(SETTINGS.name)} — Road-by-Road Directions</h1>
+    <h2>${escapeHtml(s.join('  →  '))} &nbsp;·&nbsp; ${fmtDist(r.miles)} ${uLabel()} &nbsp;·&nbsp; ${fmtHrs(r.hours)} &nbsp;·&nbsp; ${RT_LABEL[val('routeType')]} &nbsp;·&nbsp; ${new Date().toLocaleString()}</h2>
+    ${(()=>{const h=summarizeHighways(r.steps);return h.length?`<p style="font-size:13px"><b>Highways:</b> ${escapeHtml(h.join('  ›  '))}</p>`:'';})()}
+    <button class="btn" onclick="window.print()">🖨 Print directions</button>
+    ${body}
+    <p style="color:#888;font-size:11px">Generated by ${escapeHtml(SETTINGS.name)}. Source: ${escapeHtml(r._source)}. Verify signage and truck restrictions en route.</p>
+    </body></html>`);
+  w.document.close();w.focus();
+}
+
+/* ---------- live autocomplete (any US town) ---------- */
+let _acTimer;
+document.getElementById('stops').addEventListener('input',e=>{
+  if(!e.target.matches('[data-role=city]'))return;
+  const inp=e.target,row=inp.closest('.stop');const st=row?row.querySelector('[data-role=state]').value:'';
+  const q=inp.value.trim();clearTimeout(_acTimer);if(q.length<2)return;
+  _acTimer=setTimeout(()=>liveCitySuggest(inp,st,q),350);
+});
+async function liveCitySuggest(inp,st,q){
+  try{const stName=(US_STATES.find(s=>s[0]===st)||[])[1]||'';
+    const u=`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=us&q=${encodeURIComponent(q+(stName?', '+stName:''))}`;
+    const r=await fetch(u,{headers:{'Accept':'application/json'}});const j=await r.json();
+    const dl=inp.parentElement.querySelector('[data-role=citylist]');if(!dl)return;
+    const names=[...new Set(j.map(o=>o.display_name.split(',')[0].trim()).filter(Boolean))];
+    if(names.length)dl.innerHTML=names.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join('');
+  }catch(e){}
+}
+
+/* ---------- persist on any field change ---------- */
+document.addEventListener('change',e=>{if(e.target.closest('.sidebar'))saveState()});
+
+/* ============================================================
+   LOCAL AI DISPATCH ASSISTANT
+   Offline command parser + optional local Ollama for free text
+   ============================================================ */
+function toggleAssistant(){
+  const a=document.getElementById('assistant');a.classList.toggle('show');
+  if(a.classList.contains('show')){
+    if(!a.dataset.init){asPush('a','Hi — I\'m your dispatch assistant, running locally on your computer.\n\nTry:\n• route from Dallas, TX to Denver, CO\n• add a stop in Amarillo, TX\n• set weight to 76000 · axles 6\n• shortest route · avoid tolls\n• calculate · print · clear\n\nFor free-form questions, add a local Ollama model in ⚙ Settings.');a.dataset.init='1';}
+    document.getElementById('asInput').focus();
+  }
+}
+function asPush(role,text){const m=document.getElementById('asMsgs');const d=document.createElement('div');
+  d.className='msg '+role;d.textContent=text;m.appendChild(d);m.scrollTop=m.scrollHeight;return d;}
+function parseCityStr(s){s=(s||'').trim().replace(/[.]$/,'');
+  if(/^\d{5}$/.test(s))return {st:'',city:'',zip:s};
+  const m=s.match(/^(.+?)[,\s]+([A-Za-z]{2})(?:\s+(\d{5}))?$/);if(!m)return null;
+  const st=m[2].toUpperCase();if(!US_STATES.some(x=>x[0]===st))return null;
+  return {st,city:correctCity(st,m[1].trim()),zip:m[3]||''};}
+function parseLocal(text){
+  const t=text.trim();const actions=[];let say='';let m;
+  if(m=t.match(/(?:route|go|drive|trip)\s+from\s+(.+?)\s+to\s+(.+)/i)){
+    const a=parseCityStr(m[1]),b=parseCityStr(m[2]);
+    if(a&&b){actions.push({cmd:'setStops',stops:[a,b]});say=`Route set: ${a.city}, ${a.st} → ${b.city}, ${b.st}.`;}
+    else say='Give both as "City, ST" — e.g. route from Dallas, TX to Denver, CO.';
+    return {say,actions};}
+  if(m=t.match(/(?:add|insert)\s+(?:a\s+)?(?:stop|waypoint|fuel stop)\s+(?:in|at|near|for)?\s*(.+)/i)){
+    const c=parseCityStr(m[1]);
+    if(c){actions.push({cmd:'addStop',stop:c});say=`Added stop: ${c.city}, ${c.st} (between your existing stops).`;}
+    else say='Tell me the stop as "City, ST" — e.g. add a stop in Tulsa, OK.';
+    return {say,actions};}
+  const F=[['weight',/weight\D+(\d{3,7})/i,'t_weight'],['height',/height\D+([\d.]+)/i,'t_height'],
+    ['length',/length\D+([\d.]+)/i,'t_length'],['width',/width\D+([\d.]+)/i,'t_width'],
+    ['axles',/axles?\D+(\d+)/i,'t_axles'],['mpg',/mpg\D+([\d.]+)/i,'c_mpg'],
+    ['diesel',/diesel\D+\$?([\d.]+)/i,'c_diesel'],['pay',/pay\D+\$?([\d.]+)/i,'c_pay']];
+  F.forEach(([name,re,id])=>{const mm=t.match(re);if(mm){actions.push({cmd:'set',id,value:mm[1]});say+=`Set ${name} to ${mm[1]}. `;}});
+  if(/\bshortest\b/i.test(t)){actions.push({cmd:'routeType',value:'shortest'});say+='Route type: shortest. ';}
+  else if(/\bfastest\b/i.test(t)){actions.push({cmd:'routeType',value:'fastest'});say+='Route type: fastest. ';}
+  else if(/\bpractical\b/i.test(t)){actions.push({cmd:'routeType',value:'practical'});say+='Route type: practical. ';}
+  if(/round.?trip|return to start|there and back|out and back/i.test(t)){actions.push({cmd:'roundTrip',value:true});say+='Round trip on (returns to start). ';}
+  else if(/one.?way|no return|don.?t return/i.test(t)){actions.push({cmd:'roundTrip',value:false});say+='One-way (no return). ';}
+  if(/avoid\s+tolls?|no\s+tolls?|toll[- ]free/i.test(t)){actions.push({cmd:'tolls',value:'yes'});say+='Avoiding tolls. ';}
+  else if(/allow\s+tolls?|use\s+tolls?/i.test(t)){actions.push({cmd:'tolls',value:'no'});say+='Allowing tolls. ';}
+  if(/\b(calculate|calc|go|run it|route it|get miles|figure it)\b/i.test(t)){actions.push({cmd:'calculate'});say+='Calculating…';}
+  if(/\b(clear|reset)\b/i.test(t)){return {say:'Cleared the route.',actions:[{cmd:'clear'}]};}
+  if(/\b(update|refresh|reload)\b/i.test(t)){actions.push({cmd:'update'});say+='Refreshing maps, roads and route. ';}
+  if(/directions|turn.?by.?turn|road.?by.?road/i.test(t)){actions.push({cmd:'directions'});say+='Opening road-by-road directions. ';}
+  else if(/\bprint\b/i.test(t)){actions.push({cmd:'print'});say+='Opening trip sheet. ';}
+  return {say:say.trim(),actions};
+}
+async function execActions(actions){
+  for(const a of actions){
+    if(a.cmd==='setStops'&&a.stops&&a.stops.length>=2){renderStops(a.stops.map(s=>({st:s.st,city:s.city,zip:s.zip||''})));saveState();}
+    else if(a.cmd==='addStop'&&a.stop){const v=currentVals();v.splice(Math.max(1,v.length-1),0,{st:a.stop.st,city:a.stop.city,zip:a.stop.zip||''});renderStops(v);saveState();}
+    else if(a.cmd==='set'&&document.getElementById(a.id)){document.getElementById(a.id).value=a.value;saveState();}
+    else if(a.cmd==='routeType'){document.getElementById('routeType').value=a.value;saveState();}
+    else if(a.cmd==='tolls'){document.getElementById('c_avoidtolls').value=a.value;saveState();}
+    else if(a.cmd==='roundTrip'){document.getElementById('roundTrip').checked=!!a.value;saveState();}
+    else if(a.cmd==='clear'){clearRoute();}
+    else if(a.cmd==='print'){printSheet();}
+    else if(a.cmd==='directions'){directionsSheet();}
+    else if(a.cmd==='update'){await updateData();}
+    else if(a.cmd==='calculate'){await calculate();}
+  }
+}
+function parseAIJson(s){try{const m=s.match(/\{[\s\S]*\}/);return m?JSON.parse(m[0]):null;}catch(e){return null;}}
+async function askOllama(userText){
+  const url=(SETTINGS.ollamaUrl||'').replace(/\/$/,'');const model=SETTINGS.ollamaModel||'llama3.2';
+  const sys='You are a dispatch assistant for a semi-truck route planner. Convert the user request into JSON only. '+
+    'Respond with exactly: {"say":"short reply","actions":[...]}. Action forms: '+
+    '{"cmd":"setStops","stops":[{"city":"Dallas","st":"TX"},{"city":"Denver","st":"CO"}]}; '+
+    '{"cmd":"addStop","stop":{"city":"Amarillo","st":"TX"}}; '+
+    '{"cmd":"set","id":"t_weight|t_height|t_length|t_width|t_axles|c_mpg|c_diesel|c_pay","value":"NUMBER"}; '+
+    '{"cmd":"routeType","value":"practical|shortest|fastest"}; {"cmd":"tolls","value":"yes|no"}; '+
+    '{"cmd":"calculate"}; {"cmd":"clear"}; {"cmd":"print"}. Use 2-letter state codes. If unsure, return empty actions and ask in "say".';
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),25000);
+  const r=await fetch(url+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:ctl.signal,
+    body:JSON.stringify({model,stream:false,messages:[{role:'system',content:sys},{role:'user',content:userText}]})});
+  clearTimeout(to);const j=await r.json();return (j.message&&j.message.content)||'';
+}
+async function assistantSend(){
+  const inp=document.getElementById('asInput');const text=inp.value.trim();if(!text)return;
+  asPush('u',text);inp.value='';
+  const local=parseLocal(text);
+  if(local.actions.length){await execActions(local.actions);asPush('a',local.say||'Done.');return;}
+  if((SETTINGS.ollamaUrl||'').trim()){
+    const bubble=asPush('a','…thinking (local AI)…');
+    try{const out=await askOllama(text);const parsed=parseAIJson(out);
+      if(parsed&&Array.isArray(parsed.actions)&&parsed.actions.length){await execActions(parsed.actions);bubble.textContent=parsed.say||'Done.';}
+      else bubble.textContent=(parsed&&parsed.say)||out||'I could not turn that into an action.';
+    }catch(e){bubble.textContent='Local AI not reachable. Make sure Ollama is running, or use commands like "route from Dallas, TX to Denver, CO".';}
+    return;
+  }
+  asPush('a',local.say||'I can build routes with commands like:\n• route from Dallas, TX to Denver, CO\n• add a stop in Amarillo, TX\n• set weight to 76000 · axles 6\n• shortest / fastest · avoid tolls · calculate\n\nEnable a local Ollama model in ⚙ Settings for free-form questions.');
+}
+
+/* ---------- boot ---------- */
+const saved=lsGet(LS_SET);if(saved)SETTINGS={...DEFAULT_SETTINGS,...saved};
+applySettings();
+initMap();
+const startStops=restoreState();
+renderStops(startStops);
+refreshPresetList('');
+</script>
+</body>
+</html>
