@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TruckRoute Pro — Semi Truck Mileage & Routing</title>
+<!-- PWA: installable as an app on phone/desktop -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ff9f1c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TruckRoute Pro">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   :root{
@@ -1286,6 +1295,11 @@ async function assistantSend(){
     return;
   }
   asPush('a',local.say||'I can build routes with commands like:\n• route from Dallas, TX to Denver, CO\n• add a stop in Amarillo, TX\n• set weight to 76000 · axles 6\n• shortest / fastest · avoid tolls · calculate\n\nEnable a local Ollama model in ⚙ Settings for free-form questions.');
+}
+
+/* ---------- PWA: register service worker (only on http/https, ignored on file://) ---------- */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
 }
 
 /* ---------- boot ---------- */
