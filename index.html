@@ -1298,9 +1298,7 @@ async function assistantSend(){
 }
 
 /* ---------- PWA: register service worker (only on http/https, ignored on file://) ---------- */
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
-}
+if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});if(window.caches){caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});}}
 
 /* ---------- boot ---------- */
 const saved=lsGet(LS_SET);if(saved)SETTINGS={...DEFAULT_SETTINGS,...saved};
