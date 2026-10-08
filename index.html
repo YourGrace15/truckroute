@@ -547,10 +547,10 @@ function deletePreset(){
 /* ---------- map ---------- */
 function initMap(){
   map=L.map('map',{zoomControl:true,attributionControl:false}).setView([39.5,-96],4);
-  baseLayers.streets=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd'});
+  baseLayers.streets=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,subdomains:'abcd'});
   baseLayers.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
   baseLayers.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
-  baseLayers.dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd'});
+  baseLayers.dark=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,subdomains:'abcd'});
   L.control.layers({"Road map (detailed)":baseLayers.streets,"OpenStreetMap":baseLayers.osm,"Satellite":baseLayers.sat,"Dark":baseLayers.dark},null,{position:'topright'}).addTo(map);
   routeLayer=L.layerGroup().addTo(map);markerLayer=L.layerGroup().addTo(map);
   setBaseMap(SETTINGS.map);
